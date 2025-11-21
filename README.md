@@ -63,9 +63,4 @@ A simple, user-friendly dark UI:
 
 ---
 
-## 🛠 How to Run
 
-### 1️⃣ Install dependencies using uv
-```bash
-uv add gradio langchain langchain-groq langchain-community \
-faiss-cpu sentence-transformers langchain-huggingface python-dotenv
