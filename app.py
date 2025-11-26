@@ -17,7 +17,7 @@ os.environ["GROK_API_KEY"] = os.getenv("GROK_API_KEY")
 
 
 # ============================================
-# Load Embeddings (MUST MATCH training!)
+# Load Embeddings (MUST MATCH your training!)
 # ============================================
 embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-m3")
 
@@ -28,8 +28,8 @@ embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-m3")
 print("🔍 Loading FAISS vectorstore...")
 
 loaded_vectorstore = FAISS.load_local(
-    "faiss_index",  # Your saved directory
-    embeddings=embeddings,  # REQUIRED for retriever
+    "faiss_bank_terms_bge_m3",     # 🟢 THE CORRECT DIRECTORY
+    embeddings=embeddings,
     allow_dangerous_deserialization=True
 )
 
@@ -54,7 +54,7 @@ llm = ChatGroq(
 prompt = PromptTemplate(
     input_variables=["context", "question"],
     template="""
-You are a helpful AI assistant who answers questions using ONLY the provided bank policy document.
+You are a helpful AI assistant who answers questions using ONLY the content from the Bank of America Online Banking Policy document.
 
 Context:
 {context}
@@ -62,8 +62,8 @@ Context:
 Question:
 {question}
 
-Answer clearly and strictly based on the context.
-If the answer is NOT found in the context, reply with:
+Provide a clear and accurate answer using ONLY the context.
+If the answer is not present in the context, respond:
 "I could not find this information in the bank's policy document."
 """
 )
@@ -74,17 +74,21 @@ If the answer is NOT found in the context, reply with:
 # ============================================
 def rag_pipeline(query):
 
-    # 1. Retrieve relevant chunks
-    docs = retriever.invoke(query)
-    context_text = "\n\n".join([doc.page_content for doc in docs])
+    try:
+        # 1. Retrieve relevant chunks
+        docs = retriever.invoke(query)
+        context_text = "\n\n---\n\n".join([doc.page_content for doc in docs])
 
-    # 2. Create final prompt
-    final_prompt = prompt.format(context=context_text, question=query)
+        # 2. Build final prompt
+        final_prompt = prompt.format(context=context_text, question=query)
 
-    # 3. LLM generates answer
-    response = llm.invoke(final_prompt)
+        # 3. Call LLM
+        response = llm.invoke(final_prompt)
 
-    return response.content, context_text
+        return response.content, context_text
+
+    except Exception as e:
+        return f"❌ ERROR: {str(e)}", ""
 
 
 # ============================================
@@ -93,16 +97,19 @@ def rag_pipeline(query):
 demo = gr.Interface(
     fn=rag_pipeline,
     inputs=gr.Textbox(
-        label="Ask any question about Bank of America Online Banking Terms",
-        placeholder="e.g. What does Bank of America warn about using Zelle?",
+        label="💬 Ask a Question",
+        placeholder="Example: What are the limits for Zelle payments?",
         lines=1
     ),
     outputs=[
         gr.Textbox(label="📘 AI Answer", lines=10),
-        gr.Textbox(label="📄 Retrieved Contexts", lines=20)
+        gr.Textbox(label="📄 Retrieved Context", lines=20)
     ],
     title="💼 Bank Terms & Services RAG Chatbot",
-    description="Uses your PDF + FAISS + BGE-M3 Embeddings + Groq LLM for accurate answers based on the Bank of America Online Banking Agreement."
+    description=(
+        "This chatbot uses your PDF + FAISS + BGE-M3 embeddings + Groq LLM "
+        "to answer questions strictly based on the Online Banking Service Agreement."
+    ),
 )
 
 if __name__ == "__main__":
